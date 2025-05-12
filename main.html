@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Follow Me</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Tajawal', sans-serif; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .toast { transition: opacity .3s; }
+    .toast.hide { opacity: 0; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-tr from-green-100 via-blue-100 to-purple-100 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-lg bg-white/30 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden">
+    <!-- رأس مع زر الملف الشخصي -->
+    <header class="flex justify-between items-center px-6 py-4 bg-white/20 backdrop-blur-sm">
+      <div class="flex items-center space-x-2">
+        <img src="l.png" alt="Logo" class="h-8"/>
+        <h1 class="text-green-800 text-2xl font-semibold">Follow Me</h1>
+      </div>
+      <button id="profileBtn" class="p-2 bg-white/40 rounded-full hover:bg-white/60 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5.121 17.804A13.937 13.937 0 0112 15c2.54 0 4.914.736 6.879 2M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+    </header>
+
+    <main class="p-8 space-y-6">
+      <!-- توست -->
+      <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg toast hide"></div>
+
+      <!-- رصيد وشحن -->
+      <div class="flex justify-between items-center">
+        <div class="text-gray-700 font-medium">الرصيد: <span id="balance">0</span> ج</div>
+        <button onclick="location.href='recharge.html'"
+                class="py-2 px-5 bg-green-500/70 hover:bg-green-500 text-white rounded-lg transition">
+          شحن الرصيد
+        </button>
+      </div>
+
+      <!-- نموذج الطلب -->
+      <form id="orderForm" class="space-y-5">
+        <!-- اختيار منصة -->
+        <div>
+          <p class="mb-2 text-gray-800 font-semibold">اختر المنصة:</p>
+          <div id="services" class="grid grid-cols-2 gap-4">
+            <div data-value="facebook" class="service-card bg-white/20 backdrop-blur-sm border border-white/40 rounded-xl p-4 flex items-center cursor-pointer hover:shadow-md transition">
+              <img src="f.jfif" class="h-6 w-6" alt="فيسبوك"/>
+              <span class="mr-2 text-gray-700">فيسبوك</span>
+            </div>
+            <div data-value="tiktok" class="service-card bg-white/20 backdrop-blur-sm border border-white/40 rounded-xl p-4 flex items-center cursor-pointer hover:shadow-md transition">
+              <img src="t.jfif" class="h-6 w-6" alt="تيك توك"/>
+              <span class="mr-2 text-gray-700">تيك توك</span>
+            </div>
+            <div data-value="instagram" class="service-card bg-white/20 backdrop-blur-sm border border-white/40 rounded-xl p-4 flex items-center cursor-pointer hover:shadow-md transition">
+              <img src="i.png" class="h-6 w-6" alt="انستجرام"/>
+              <span class="mr-2 text-gray-700">انستجرام</span>
+            </div>
+            <div data-value="youtube" class="service-card bg-white/20 backdrop-blur-sm border border-white/40 rounded-xl p-4 flex items-center cursor-pointer hover:shadow-md transition">
+              <img src="y.jfif" class="h-6 w-6" alt="يوتيوب"/>
+              <span class="mr-2 text-gray-700">يوتيوب</span>
+            </div>
+          </div>
+          <input type="hidden" id="serviceInput" name="service" required/>
+        </div>
+
+        <!-- الرابط -->
+        <div>
+          <label for="url" class="block mb-1 text-gray-700 font-medium">الرابط:</label>
+          <input type="url" id="url" name="url" required placeholder="https://"
+                 class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
+        </div>
+
+        <!-- العدد والسعر -->
+        <div class="grid grid-cols-2 gap-4 items-end">
+          <div>
+            <label for="amount" class="block mb-1 text-gray-700 font-medium">العدد:</label>
+            <input type="text" id="amount" name="amount" value="1000"
+                   inputmode="numeric" pattern="\d*" required placeholder="أرقام إنجليزية فقط"
+                   class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
+          </div>
+          <div class="text-gray-800 font-medium">
+            السعر: <span id="price">0</span> ج
+          </div>
+        </div>
+
+        <!-- زر الإرسال -->
+        <button type="submit"
+                class="w-full py-3 bg-green-500/70 hover:bg-green-500 text-white font-semibold rounded-lg transition">
+          تقديم الطلب
+        </button>
+      </form>
+    </main>
+
+    <footer class="bg-white/20 backdrop-blur-sm text-center p-4 text-gray-600 text-sm">
+      جميع الحقوق محفوظة © 2025
+    </footer>
+  </div>
+
+  <!-- مودال الملف الشخصي -->
+  <div id="profileModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-xl p-6 w-80 space-y-4">
+      <h3 class="text-lg font-semibold text-gray-800">ملفك الشخصي</h3>
+      <p><span class="font-medium">البريد:</span> <span id="prEmail"></span></p>
+      <p><span class="font-medium">اسم الحساب:</span> <span id="prUsername"></span></p>
+      <button id="closeProfile"
+              class="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+        إغلاق
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // تأكد من وجود حساب
+    const userJSON = localStorage.getItem('user');
+    if (!userJSON) {
+      location.href = 'index.html';
+    }
+    const user = JSON.parse(userJSON);
+
+    // رصيد
+    const getBalance = () => +localStorage.getItem('balance') || 0;
+    const setBalance = v => localStorage.setItem('balance', v);
+    const refreshBal = () => document.getElementById('balance').textContent = getBalance();
+    refreshBal();
+
+    const prices = { facebook:10, tiktok:20, instagram:20, youtube:10 };
+    let selected = null;
+
+    // اختيار خدمة
+    document.querySelectorAll('.service-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('border-green-500'));
+        card.classList.add('border-green-500');
+        selected = card.dataset.value;
+        document.getElementById('serviceInput').value = selected;
+        updatePrice();
+      });
+    });
+
+    // حساب السعر
+    document.getElementById('amount').addEventListener('input', updatePrice);
+    function updatePrice() {
+      const amt = parseInt(document.getElementById('amount').value) || 0;
+      const priceEl = document.getElementById('price');
+      if (!selected || amt < 1000) {
+        priceEl.textContent = '0';
+      } else {
+        priceEl.textContent = ((amt/1000)*prices[selected]).toFixed(2);
+      }
+    }
+
+    // إرسال الطلب
+    document.getElementById('orderForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const amt  = parseInt(document.getElementById('amount').value) || 0;
+      const cost = parseFloat(document.getElementById('price').textContent) || 0;
+      if (!selected)            return showToast('اختر منصة أولًا', true);
+      if (amt < 1000)           return showToast('الحد الأدنى للطلب 1000', true);
+      if (getBalance() < cost)  return showToast('الرصيد غير كافٍ', true);
+
+      setBalance(getBalance() - cost);
+      refreshBal();
+      showToast('تم الطلب، سوف يصل خلال ساعة إلى 24 ساعة');
+    });
+
+    // توست
+    function showToast(msg, isError=false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hide');
+      t.classList.toggle('bg-red-500', isError);
+      t.classList.toggle('bg-green-500', !isError);
+      setTimeout(() => t.classList.add('hide'), 3000);
+    }
+
+    // المودال
+    document.getElementById('profileBtn').addEventListener('click', () => {
+      document.getElementById('prEmail').textContent = user.email;
+      document.getElementById('prUsername').textContent = user.username;
+      document.getElementById('profileModal').classList.remove('hidden');
+    });
+    document.getElementById('closeProfile').addEventListener('click', () => {
+      document.getElementById('profileModal').classList.add('hidden');
+    });
+  </script>
+</body>
+</html>
