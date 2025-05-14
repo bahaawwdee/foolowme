@@ -8,15 +8,27 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"/>
   <style>
     body { font-family: 'Tajawal', sans-serif; }
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
-      -webkit-appearance: none; margin: 0;
+    input::-webkit-inner-spin-button,
+    input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #fff; padding: .75rem 1.25rem;
+      border-radius: .5rem; opacity: 0; transition: opacity .3s; z-index: 999;
     }
-    .toast { transition: opacity .3s; }
-    .toast.hide { opacity: 0; }
+    .toast.show { opacity: 1; }
+    /* Overlay to freeze UI */
+    #freezeOverlay {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.5);
+      z-index: 998; display: none;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-tr from-green-100 via-blue-100 to-purple-100 flex items-center justify-center p-4">
+
+  <!-- freeze overlay -->
+  <div id="freezeOverlay"></div>
+  <!-- toast notification -->
+  <div id="toast" class="toast"></div>
 
   <div class="w-full max-w-lg bg-white/30 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden">
     <!-- رأس مع زر الملف الشخصي -->
@@ -35,7 +47,7 @@
 
     <main class="p-8 space-y-6">
       <!-- توست -->
-      <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg toast hide"></div>
+      <!-- (already above) -->
 
       <!-- رصيد وشحن -->
       <div class="flex justify-between items-center">
@@ -93,11 +105,16 @@
         </div>
 
         <!-- زر الإرسال -->
-        <button type="submit"
+        <button type="submit" id="submitBtn"
                 class="w-full py-3 bg-green-500/70 hover:bg-green-500 text-white font-semibold rounded-lg transition">
           تقديم الطلب
         </button>
       </form>
+
+      <!-- زر متابعة الطلبات -->
+      <button id="trackOrdersBtn" class="w-full py-3 bg-blue-500/70 hover:bg-blue-500 text-white font-semibold rounded-lg transition">
+        متابعة الطلبات
+      </button>
     </main>
 
     <footer class="bg-white/20 backdrop-blur-sm text-center p-4 text-gray-600 text-sm">
@@ -105,92 +122,205 @@
     </footer>
   </div>
 
-  <!-- مودال الملف الشخصي -->
-  <div id="profileModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden">
-    <div class="bg-white rounded-xl p-6 w-80 space-y-4">
-      <h3 class="text-lg font-semibold text-gray-800">ملفك الشخصي</h3>
-      <p><span class="font-medium">البريد:</span> <span id="prEmail"></span></p>
-      <p><span class="font-medium">اسم الحساب:</span> <span id="prUsername"></span></p>
-      <button id="closeProfile"
+  <!-- مودال الخدمات -->
+  <div id="servicesModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-xl p-6 w-96 space-y-4">
+      <h3 class="text-lg font-semibold text-gray-800">اختر الخدمة</h3>
+      <div id="servicesList" class="space-y-3"></div>
+      <button onclick="closeServiceModal()"
               class="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
         إغلاق
       </button>
     </div>
   </div>
 
-  <script>
-    // تأكد من وجود حساب
-    const userJSON = localStorage.getItem('user');
-    if (!userJSON) {
-      location.href = 'index.html';
-    }
-    const user = JSON.parse(userJSON);
+  <!-- مودال متابعة الطلبات -->
+  <div id="orderModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-xl p-6 w-96 space-y-4">
+      <h3 class="text-lg font-semibold text-gray-800">طلباتك السابقة</h3>
+      <div id="ordersList" class="space-y-3"></div>
+      <button onclick="closeOrderModal()"
+              class="mt-4 w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+        إغلاق
+      </button>
+    </div>
+  </div>
 
-    // رصيد
+  <script>
+    // toast helper
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    // freeze UI
+    function freezeUI() {
+      document.getElementById('freezeOverlay').style.display = 'block';
+    }
+
+    // ensure user
+    if (!localStorage.getItem('user')) location.href = 'index.html';
+
+    // balance
     const getBalance = () => +localStorage.getItem('balance') || 0;
     const setBalance = v => localStorage.setItem('balance', v);
     const refreshBal = () => document.getElementById('balance').textContent = getBalance();
     refreshBal();
 
-    const prices = { facebook:10, tiktok:20, instagram:20, youtube:10 };
-    let selected = null;
+    // services data
+    const platformServices = {
+      facebook: [
+        {name:"زيادة متابعين",value:"followers",price:25},
+        {name:"لايكات صفحة",value:"page_likes",price:12},
+        {name:"تعليقات عربية",value:"comments",price:20},
+        {name:"لايكات منشورات",value:"post_likes",price:7}
+      ],
+      tiktok: [
+        {name:"زيادة متابعين",value:"followers",price:28},
+        {name:"لايكات فيديو",value:"video_likes",price:9},
+        {name:"مشاهدات",value:"views",price:6}
+      ],
+      instagram: [
+        {name:"زيادة متابعين",value:"followers",price:27},
+        {name:"لايكات منشورات",value:"likes",price:10},
+        {name:"تعليقات",value:"comments",price:18}
+      ],
+      youtube: [
+        {name:"زيادة مشتركين",value:"subscribers",price:30},
+        {name:"مشاهدات فيديو",value:"views",price:8},
+        {name:"لايكات",value:"likes",price:10}
+      ]
+    };
 
-    // اختيار خدمة
-    document.querySelectorAll('.service-card').forEach(card => {
-      card.addEventListener('click', () => {
-        document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('border-green-500'));
-        card.classList.add('border-green-500');
-        selected = card.dataset.value;
-        document.getElementById('serviceInput').value = selected;
-        updatePrice();
+    let selPlat, selServ, selPrice;
+
+    // open services modal
+    document.querySelectorAll('.service-card').forEach(c => {
+      c.addEventListener('click', () => {
+        selPlat = c.dataset.value;
+        const list = document.getElementById('servicesList');
+        list.innerHTML = '';
+        platformServices[selPlat].forEach(s => {
+          const btn = document.createElement('button');
+          btn.textContent = `${s.name} (${s.price} ج /1000)`;
+          btn.className = 'w-full py-2 bg-green-100 hover:bg-green-200 rounded-lg text-right';
+          btn.onclick = () => {
+            selServ = s.value;
+            selPrice = s.price;
+            document.getElementById('serviceInput').value = `${selPlat}-${selServ}`;
+            updatePrice();
+            closeServiceModal();
+          };
+          list.appendChild(btn);
+        });
+        document.getElementById('servicesModal').classList.remove('hidden');
       });
     });
+    function closeServiceModal() {
+      document.getElementById('servicesModal').classList.add('hidden');
+    }
 
-    // حساب السعر
-    document.getElementById('amount').addEventListener('input', updatePrice);
+    // price calc
     function updatePrice() {
       const amt = parseInt(document.getElementById('amount').value) || 0;
-      const priceEl = document.getElementById('price');
-      if (!selected || amt < 1000) {
-        priceEl.textContent = '0';
-      } else {
-        priceEl.textContent = ((amt/1000)*prices[selected]).toFixed(2);
-      }
+      document.getElementById('price').textContent =
+        (!selServ || amt < 1000) ? '0' : ((amt/1000)*selPrice).toFixed(2);
+    }
+    document.getElementById('amount').addEventListener('input', updatePrice);
+
+    // save order
+    function saveOrder(o) {
+      const arr = JSON.parse(localStorage.getItem('orders')||'[]');
+      arr.push(o);
+      localStorage.setItem('orders', JSON.stringify(arr));
     }
 
-    // إرسال الطلب
+    // submit
     document.getElementById('orderForm').addEventListener('submit', e => {
       e.preventDefault();
-      const amt  = parseInt(document.getElementById('amount').value) || 0;
+      const url = document.getElementById('url').value.trim();
+      if (!url) {
+        return showToast('الرجاء إدخال رابط صحيح');
+      }
+      const amt = parseInt(document.getElementById('amount').value) || 0;
       const cost = parseFloat(document.getElementById('price').textContent) || 0;
-      if (!selected)            return showToast('اختر منصة أولًا', true);
-      if (amt < 1000)           return showToast('الحد الأدنى للطلب 1000', true);
-      if (getBalance() < cost)  return showToast('الرصيد غير كافٍ', true);
-
+      const orders = JSON.parse(localStorage.getItem('orders')||'[]');
+      if (orders.some(o => o.url === url && o.service === selServ && o.remaining > 0)) {
+        return showToast('هذا الطلب قيد التنفيذ بالفعل');
+      }
+      if (!selServ || amt < 1000 || getBalance() < cost) {
+        return showToast('راجع بيانات الطلب أو الرصيد');
+      }
+      // success
+      freezeUI();
+      showToast('تم تقديم الطلب بنجاح');
       setBalance(getBalance() - cost);
       refreshBal();
-      showToast('تم الطلب، سوف يصل خلال ساعة إلى 24 ساعة');
+      const id = Date.now();
+      const totalSec = (Math.floor(Math.random()*24) + 1) * 3600;
+      saveOrder({id,url,service:selServ,cost,remaining: totalSec});
+      setTimeout(() => location.reload(), 3000);
     });
 
-    // توست
-    function showToast(msg, isError=false) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.remove('hide');
-      t.classList.toggle('bg-red-500', isError);
-      t.classList.toggle('bg-green-500', !isError);
-      setTimeout(() => t.classList.add('hide'), 3000);
+    // track orders
+    document.getElementById('trackOrdersBtn').onclick = () => {
+      document.getElementById('orderModal').classList.remove('hidden');
+      renderOrders();
+    };
+    function closeOrderModal() {
+      document.getElementById('orderModal').classList.add('hidden');
     }
 
-    // المودال
-    document.getElementById('profileBtn').addEventListener('click', () => {
-      document.getElementById('prEmail').textContent = user.email;
-      document.getElementById('prUsername').textContent = user.username;
-      document.getElementById('profileModal').classList.remove('hidden');
-    });
-    document.getElementById('closeProfile').addEventListener('click', () => {
-      document.getElementById('profileModal').classList.add('hidden');
-    });
+    // render orders
+    function renderOrders() {
+      const listEl = document.getElementById('ordersList');
+      listEl.innerHTML = '';
+      const orders = JSON.parse(localStorage.getItem('orders')||'[]');
+      orders.forEach(o => {
+        const div = document.createElement('div');
+        div.className = 'rounded-xl p-4 mb-3 bg-white/40';
+        div.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span>طلب #${o.id}</span>
+            <span id="cd-${o.id}">${formatTime(o.remaining)}</span>
+          </div>
+          <div id="status-${o.id}" class="mt-2 text-red-600 font-semibold"></div>
+        `;
+        listEl.appendChild(div);
+        startCd(o);
+      });
+    }
+
+    function startCd(o) {
+      let rem = o.remaining;
+      const cdEl = document.getElementById(`cd-${o.id}`);
+      const statusEl = document.getElementById(`status-${o.id}`);
+      const iv = setInterval(() => {
+        if (rem <= 0) {
+          clearInterval(iv);
+          cdEl.textContent = '00:00:00';
+          statusEl.textContent = 'فشل الرابط غير صالح';
+          // refund
+          setBalance(getBalance() + o.cost);
+          refreshBal();
+          // remove
+          const arr = JSON.parse(localStorage.getItem('orders')||'[]')
+                       .filter(x => x.id !== o.id);
+          localStorage.setItem('orders', JSON.stringify(arr));
+        } else {
+          rem--;
+          cdEl.textContent = formatTime(rem);
+        }
+      }, 1000);
+    }
+
+    function formatTime(sec) {
+      const h = Math.floor(sec/3600),
+            m = Math.floor((sec%3600)/60),
+            s = sec%60;
+      return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
   </script>
 </body>
 </html>
