@@ -1,30 +1,33 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>شحن الرصيد</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Tajawal', sans-serif; }
-    .toast { transition: opacity .3s; }
-    .toast.hide { opacity: 0; }
+    .toast { 
+      position: fixed; top: 20px; left:50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #fff; padding: .75rem 1.25rem;
+      border-radius: .5rem; opacity: 0; transition: opacity .3s; z-index:999;
+    }
+    .toast.show { opacity: 1; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   </style>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body class="min-h-screen bg-gradient-to-tr from-green-100 via-blue-100 to-purple-100 flex items-center justify-center p-4">
-  <div class="w-full max-w-md bg-white/30 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden">
 
+  <!-- toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <div class="w-full max-w-md bg-white/30 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden">
     <header class="bg-white/20 backdrop-blur-sm text-green-800 text-center py-5">
       <h2 class="text-2xl font-semibold">شحن الرصيد</h2>
     </header>
 
     <main class="p-6 space-y-6">
-      <!-- توست -->
-      <div id="toast"
-           class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg toast hide">
-      </div>
-
       <form id="rechargeForm" class="space-y-4">
 
         <!-- رقم الدفع الثابت -->
@@ -44,11 +47,11 @@
                  class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
         </div>
 
-    
         <!-- هاتف المرسل -->
         <div>
           <label for="senderPhone" class="block mb-1 text-gray-700 font-medium">الرقم المرسل منه :</label>
           <input type="text" id="senderPhone" required
+                 placeholder="مثال: 01XXXXXXXXX"
                  class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
         </div>
 
@@ -72,22 +75,57 @@
   </div>
 
   <script>
+    // show toast
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;
-      t.classList.remove('hide');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // attempt count
+    const attemptsKey = 'rechargeAttempts';
+    function getAttempts() {
+      return +localStorage.getItem(attemptsKey) || 0;
+    }
+    function incAttempts() {
+      const a = getAttempts() + 1;
+      localStorage.setItem(attemptsKey, a);
+      return a;
     }
 
     document.getElementById('rechargeForm').addEventListener('submit', e => {
       e.preventDefault();
+
+      const amount = +document.getElementById('amount').value;
+      const phone = document.getElementById('senderPhone').value.trim();
+
+      // validate phone length
+      if (phone.length !== 11) {
+        showToast('الرقم المرسل يجب أن يكون 11 رقمًا');
+        return;
+      }
+
+      // increment attempts
+      const att = incAttempts();
+
+      // first two attempts always error
+      if (att < 3) {
+        showToast(`حدث خطأ، يرجى المحاولة مرة أخرى (${att}/2)`);
+        return;
+      }
+
+      // on third+ attempt, proceed
       showToast('جاري معالجة طلبك...');
+      // reset attempts
+      localStorage.removeItem(attemptsKey);
+
       setTimeout(() => {
-        const amt = +document.getElementById('amount').value;
         const bal = +localStorage.getItem('balance') || 0;
-        localStorage.setItem('balance', bal + amt);
+        localStorage.setItem('balance', bal + amount);
+        // redirect back to index
         location.href = 'index.html';
       }, 5000);
-
     });
   </script>
 </body>
