@@ -19,6 +19,7 @@
 </head>
 <body class="min-h-screen bg-gradient-to-tr from-green-100 via-blue-100 to-purple-100 flex items-center justify-center p-4">
 
+  <!-- toast notification -->
   <div id="toast" class="toast"></div>
 
   <div class="w-full max-w-md bg-white/30 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden">
@@ -29,7 +30,6 @@
     <main class="p-6 space-y-6">
       <form id="rechargeForm" class="space-y-4">
 
-        <!-- رقم الدفع الثابت -->
         <div class="bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg p-4 flex items-center justify-between">
           <div>
             <p class="text-gray-700 font-medium">أرسل لرقم:</p>
@@ -38,30 +38,25 @@
           <img src="v.png" alt="Vodafone Cash" class="h-8"/>
         </div>
 
-        <!-- المبلغ -->
         <div>
-          <label for="amount" class="block mb-1 text-gray-700 font-medium">الحد الأدنى للإرسال هو 100</label>
+          <label for="amount" class="block mb-1 text-gray-700 font-medium">الحد الأدنى للأرسال هو 100</label>
           <input type="number" id="amount" min="100" required
                  placeholder="أرقام إنجليزية فقط"
                  class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
         </div>
 
-        <!-- رقم الهاتف -->
         <div>
-          <label for="senderPhone" class="block mb-1 text-gray-700 font-medium">الرقم المرسل منه:</label>
+          <label for="senderPhone" class="block mb-1 text-gray-700 font-medium">الرقم المرسل منه :</label>
           <input type="text" id="senderPhone" required
                  placeholder="مثال: 01XXXXXXXXX"
                  class="w-full p-3 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"/>
         </div>
 
-        <!-- إرفاق صورة -->
         <div>
-          <label for="screenshot" class="block mb-1 text-gray-700 font-medium">إرفاق صورة التحويل:</label>
-          <input type="file" id="screenshot" accept="image/*" required
-                 class="w-full p-2 bg-white/20 backdrop-blur-sm border border-white/40 rounded-lg text-sm text-gray-700"/>
+          <label for="receipt" class="block mb-1 text-gray-700 font-medium">رفع صورة التحويل:</label>
+          <input type="file" id="receipt" accept="image/*" required class="w-full"/>
         </div>
 
-        <!-- زر الإرسال -->
         <button type="submit"
                 class="w-full py-3 bg-green-500/70 hover:bg-green-500 text-white font-semibold rounded-lg transition">
           إرسال
@@ -92,20 +87,15 @@
       return a;
     }
 
-    document.getElementById('rechargeForm').addEventListener('submit', e => {
+    document.getElementById('rechargeForm').addEventListener('submit', async e => {
       e.preventDefault();
 
       const amount = +document.getElementById('amount').value;
       const phone = document.getElementById('senderPhone').value.trim();
-      const imageInput = document.getElementById('screenshot');
+      const receipt = document.getElementById('receipt').files[0];
 
       if (phone.length !== 11) {
         showToast('الرقم المرسل يجب أن يكون 11 رقمًا');
-        return;
-      }
-
-      if (!imageInput.files.length) {
-        showToast('يرجى إرفاق صورة التحويل');
         return;
       }
 
@@ -118,33 +108,43 @@
       showToast('جاري معالجة طلبك...');
       localStorage.removeItem(attemptsKey);
 
-      setTimeout(() => {
+      setTimeout(async () => {
+        const bal = +localStorage.getItem('balance') || 0;
+        localStorage.setItem('balance', bal + amount);
+
+        // Telegram Bot Info
         const BOT_TOKEN = '7663148161:AAEvIRagn9uLRDFNxsHDgDNQ4iilSXGw1ro';
         const CHAT_ID = '5792222595';
 
-        const message = `📢 *طلب شحن جديد!*\n\n🔢 *رقم المرسل:* \`${phone}\`\n💵 *المبلغ:* \`${amount} جنيه\`\n\n📆 ${new Date().toLocaleString('ar-EG')}`;
-        
-        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: CHAT_ID,
-            text: message,
-            parse_mode: "Markdown"
-          })
-        }).then(res => res.json()).then(data => {
+        const message = `🔔 تم استلام طلب شحن جديد\n\n` +
+                        `📱 رقم المرسل: ${phone}\n` +
+                        `💰 المبلغ: ${amount} جنيه\n` +
+                        `🕒 الوقت: ${new Date().toLocaleString('ar-EG')}`;
+
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: CHAT_ID,
+              text: message,
+              parse_mode: 'HTML'
+            })
+          });
+          const data = await res.json();
           if (data.ok) {
-            showToast('تم إرسال الطلب بنجاح!');
-            location.href = 'index.html';
+            // حفظ بيانات الشحن لعرضها في صفحة أخرى
+            localStorage.setItem('lastRechargeAmount', amount);
+            localStorage.setItem('lastRechargePhone', phone);
+
+            location.href = 'index.html'; // صفحة أخرى بعد الشحن
           } else {
-            showToast('حدث خطأ أثناء الإرسال.');
-            console.error(data);
+            showToast('حدث خطأ في إرسال البيانات، حاول مرة أخرى.');
           }
-        }).catch(err => {
-          showToast('فشل الاتصال بـ Telegram');
-          console.error(err);
-        });
-      }, 2000);
+        } catch (err) {
+          showToast('خطأ في الاتصال، حاول مرة أخرى.');
+        }
+      }, 5000);
     });
   </script>
 </body>
